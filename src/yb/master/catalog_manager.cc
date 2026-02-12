@@ -14263,6 +14263,8 @@ Status CatalogManager::GetTabletsMetadata(const GetTabletsMetadataRequestPB* req
       }
 
       auto replica_locations = tablet->GetReplicaLocations();
+      uint64_t leader_sst_files_size = 0;
+      uint64_t leader_wal_files_size = 0;
       for (const auto& [ts_uuid, replica] : *replica_locations) {
         // Get tablet server info to extract IP address and PostgreSQL port
         auto ts_desc_result = master_->ts_manager()->LookupTSByUUID(ts_uuid);
@@ -14289,8 +14291,12 @@ Status CatalogManager::GetTabletsMetadata(const GetTabletsMetadataRequestPB* req
 
           if (replica.role == PeerRole::LEADER) {
             leader_address = server_address;
+            leader_sst_files_size = replica.drive_info.sst_files_size;
+            leader_wal_files_size = replica.drive_info.wal_files_size;
           } else {
             tablet_metadata->add_replicas(server_address);
+            tablet_metadata->add_replicas_sst_files_size(replica.drive_info.sst_files_size);
+            tablet_metadata->add_replicas_wal_files_size(replica.drive_info.wal_files_size);
           }
         }
       }
@@ -14298,6 +14304,8 @@ Status CatalogManager::GetTabletsMetadata(const GetTabletsMetadataRequestPB* req
       // Add leader as the last replica
       if (!leader_address.empty()) {
         tablet_metadata->add_replicas(leader_address);
+        tablet_metadata->add_replicas_sst_files_size(leader_sst_files_size);
+        tablet_metadata->add_replicas_wal_files_size(leader_wal_files_size);
       }
 
       // last_status is a required field in the PB
